@@ -6,7 +6,7 @@ const QuoraExtractor = require("./src/lib/Quora.class");
 require('dotenv').config();
 config('3b4be950139a19b375148d26dd3df1b6');
 const openai = new OpenAI({
-    apiKey: ""
+    apiKey: process.env.OPENAI_API_KEY
 });
 
 async function saveAudioFromOpenAITTS(text, filePath) {
