@@ -1,0 +1,26 @@
+{
+  "name": "quora-to-short",
+  "version": "1.0.0",
+  "description": "",
+  "main": "tes.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@remotion/cli": "^4.0.134",
+    "@sefinek/google-tts-api": "^2.1.5",
+    "axios": "^1.6.8",
+    "canvas": "^2.11.2",
+    "ffcreator": "^7.3.5",
+    "ffmpeg-installer": "^1.0.2",
+    "fingerprint-injector": "^2.1.50",
+    "fluent-ffmpeg": "^2.1.2",
+    "gtranslate-api": "^1.0.4",
+    "openai": "^4.32.1",
+    "playwright": "^1.43.0",
+    "puppeteer": "^22.6.3",
+    "tiktok-tts": "^1.1.16"
+  }
+}
