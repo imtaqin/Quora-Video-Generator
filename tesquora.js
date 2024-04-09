@@ -1,90 +1,74 @@
-const ffmpeg = require('fluent-ffmpeg');
+const { execSync } = require('child_process');
 const fs = require('fs');
-const path = require('path');
 
-// Paths to folders and files
-const audioFolder = './audio';
-const screenshotFolder = './screenshot';
-const backgroundVideoPath = './background.mp4';
-const backgroundAudioPath = './background.mp3';
-const outputPath = './outputVideo.mp4';
-
-// Array to hold audio and image files in order
-const files = [
-    {img: 'title.png', audio: 'title.mp3'},
-    {img: 'post.png', audio: 'post.mp3'},
-    {img: 'reply1.png', audio: 'reply1.mp3'},
-    {img: 'reply2.png', audio: 'reply2.mp3'},
-    {img: 'reply3.png', audio: 'reply3.mp3'}
-];
-
-// Create a temporary folder for intermediate steps
-const tempFolder = './temp';
-if (!fs.existsSync(tempFolder)) {
-    fs.mkdirSync(tempFolder);
+function getDuration(filePath) {
+  const command = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
+  try {
+    const result = parseFloat(execSync(command, { encoding: 'utf-8' }).trim());
+    return result;
+  } catch (error) {
+    console.error(`Error fetching duration for ${filePath}:`, error);
+    return 0;
+  }
 }
 
-const processFiles = async () => {
-    let inputFiles = '';
-    for (const file of files) {
-        const imgPath = path.join(screenshotFolder, file.img);
-        const audioPath = path.join(audioFolder, file.audio);
-        const outputVideo = path.join(tempFolder, `${path.basename(file.img, '.png')}.mp4`);
+function getResolution(filePath) {
+  const command = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${filePath}"`;
+  try {
+    const [width, height] = execSync(command, { encoding: 'utf-8' }).trim().split('x');
+    return { width: parseInt(width, 10), height: parseInt(height, 10) };
+  } catch (error) {
+    console.error(`Error fetching resolution for ${filePath}:`, error);
+    return { width: 1920, height: 1080 }; // Defaulting to 1080p
+  }
+}
 
-        await new Promise((resolve, reject) => {
-            ffmpeg()
-                .input(imgPath)
-                .loop()
-                .input(audioPath)
-                .audioFilters([
-                    {filter: 'volume', options: '0.4'}
-                ])
-                .addOption('-shortest')
-                .addOption('-r', '30')
-                .videoCodec('libx264')
-                .size('90%')
-                .save(outputVideo)
-                .on('end', () => {
-                    inputFiles += `file '${outputVideo}'\n`;
-                    resolve();
-                })
-                .on('error', (err) => {
-                    console.log('An error occurred: ' + err.message);
-                    reject(err);
-                });
-        });
-    }
+const backgroundVideo = 'background.mp4';
+const backgroundAudio = 'background.mp3';
+const outputVideo = 'output.mp4';
 
-    const listPath = path.join(tempFolder, 'list.txt');
-    fs.writeFileSync(listPath, inputFiles);
+// Assuming directories and naming as per your setup
+const audioFiles = ['./audio/title.mp3', './audio/post.mp3', './audio/reply1.mp3', './audio/reply2.mp3', './audio/reply3.mp3'];
+const imageFiles = ['./screenshot/title.png', './screenshot/post.png', './screenshot/reply1.png', './screenshot/reply2.png', './screenshot/reply3.png'];
 
-    // Combine all videos into one
-    await new Promise((resolve, reject) => {
-        ffmpeg()
-            .input(listPath)
-            .inputFormat('concat')
-            .input(backgroundAudioPath)
-            .inputFPS(30)
-            .audioFilters([
-                {filter: 'volume', options: '0.4'}
-            ])
-            .videoCodec('libx264')
-            .audioCodec('aac')
-            .outputOptions('-c:v libx264')
-            .outputOptions('-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"')
-            .mergeToFile(outputPath)
-            .on('end', function() {
-                console.log('Merging finished !');
-                resolve();
-            })
-            .on('error', function(err) {
-                reject(err);
-            });
-    });
+const resolution = getResolution(backgroundVideo);
+const scaledWidth = Math.floor(resolution.width * 0.9);
+const scaledHeight = Math.floor(resolution.height * 0.9);
 
-    console.log('Video creation completed.');
-};
+let ffmpegInputs = `-y -i "${backgroundVideo}" -i "${backgroundAudio}" `;
+let filterComplex = '';
+let audioMixInstructions = '[1:a]volume=0.8[a0]'; // Consider the first audio input as the background music after volume adjustment
 
-processFiles().catch((error) => {
-    console.error('Error processing files:', error);
+// Loop over the audio and image files to construct input paths, scaling, and overlay instructions
+audioFiles.forEach((file, index) => {
+    const imageFile = imageFiles[index];
+    const duration = getDuration(file);
+    const audioIndex = (index + 1) * 2;
+    const imageIndex = audioIndex + 1;
+    
+    ffmpegInputs += `-i "${file}" -i "${imageFile}" `;
+    filterComplex += `[${imageIndex}:v]scale=${scaledWidth}:${scaledHeight}[scaled${index}];`;
+    filterComplex += `[0:v][scaled${index}]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,${duration})'[video${index}];`;
+    audioMixInstructions += `;[${audioIndex}:a]volume=1.0[a${index+1}]`;
 });
+
+// Constructing the amix component by including all audio streams.
+audioMixInstructions += `;[a0]`;
+for (let i = 1; i <= audioFiles.length; i++) {
+    audioMixInstructions += `[a${i}]`;
+}
+audioMixInstructions += `amix=inputs=${audioFiles.length + 1}[audio]`;
+
+// Close the video chain to present the last overlay output
+filterComplex += audioMixInstructions;
+
+const mapping = `-map "[video${audioFiles.length - 1}]" -map "[audio]" -c:v libx264 -c:a aac "${outputVideo}"`;
+
+const ffmpegCommand = `ffmpeg ${ffmpegInputs} -filter_complex "${filterComplex}" ${mapping}`;
+
+try {
+  execSync(ffmpegCommand, { stdio: 'inherit' });
+  console.log('Video processing completed successfully.');
+} catch (error) {
+  console.error('Failed to execute FFmpeg command:', error);
+}

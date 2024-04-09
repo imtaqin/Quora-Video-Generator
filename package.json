@@ -13,6 +13,7 @@
     "@sefinek/google-tts-api": "^2.1.5",
     "axios": "^1.6.8",
     "canvas": "^2.11.2",
+    "dotenv": "^16.4.5",
     "ffcreator": "^7.3.5",
     "ffmpeg-installer": "^1.0.2",
     "fingerprint-injector": "^2.1.50",
