@@ -13,6 +13,11 @@ Langkah pertama setelah menginstall Node.js adalah memastikan bahwa Anda memilik
 ```bash
 cd path\ke\direktori\file
 ```
+install dependensi nodejs nya terlebih dahulu dengan perintah:
+
+```bash
+npm install
+```
 
 Setelah itu, jalankan file dengan perintah:
 
