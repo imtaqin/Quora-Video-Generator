@@ -10,7 +10,7 @@ class QuoraExtractor {
 
   async init() {
     this.browser = await puppeteer.launch({
-      headless: "new",
+      headless: false,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     this.page = await this.browser.newPage();
