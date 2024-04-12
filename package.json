@@ -11,13 +11,18 @@
   "dependencies": {
     "@sefinek/google-tts-api": "^2.1.5",
     "axios": "^1.6.8",
+    "canvas": "^2.11.2",
+    "cli-box": "^6.0.10",
     "dotenv": "^16.4.5",
     "enquirer": "^2.4.1",
     "fingerprint-injector": "^2.1.50",
     "fluent-ffmpeg": "^2.1.2",
     "inquirer": "^9.2.17",
     "openai": "^4.32.1",
+    "progress": "^2.0.3",
     "puppeteer": "^22.6.3",
-    "tiktok-tts": "^1.1.16"
+    "terminal-kit": "^3.1.1",
+    "tiktok-tts": "^1.1.16",
+    "winston": "^3.13.0"
   }
 }

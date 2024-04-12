@@ -6,16 +6,28 @@ class QuoraExtractor {
     this.url = url;
     this.browser = null;
     this.page = null;
+    this.response = null; // Predefine the response here to ensure it's accessible when needed.
   }
 
   async init() {
     this.browser = await puppeteer.launch({
-      headless: false,
+      headless: "new", 
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
-    this.page = await this.browser.newPage();
+    this.page = await this.browser.newPage(); // Ensure the page is created before attaching event listeners.
+
+    this.page.on('response', async (response) => {
+      if (response.url().includes('https://id.quora.com/graphql/gql_para_POST?q=CommentableCommentAreaLoaderInnerQuery')) {
+        this.response = await response.json(); // Storing the parsed JSON response directly.
+      }
+    });
+
     await this.page.setViewport({ width: 1739, height: 1979 });
-    await this.page.setCookie(...JSON.parse(fs.readFileSync("cookie.json", "utf8")));
+    
+    const cookiesStr = fs.readFileSync('cookie.json', 'utf8');
+    const cookies = cookiesStr ? JSON.parse(cookiesStr) : [];
+    await this.page.setCookie(...cookies);
+
     await this.page.goto(this.url, { waitUntil: 'networkidle0' });
   }
 
@@ -49,39 +61,29 @@ class QuoraExtractor {
     }, postSelector);
   }
 
-  async extractAndScreenshotReplies() {
-    const screenshotSelector = 'div.q-box.qu-pt--small.qu-bg--raised div.q-text.qu-dynamicFontSize--regular';
- 
-    const textSelector = 'div.q-box.qu-pt--small.qu-bg--raised div.q-text.qu-dynamicFontSize--regular p';
-    
-    const replyElements = await this.page.$$(screenshotSelector);
-    let screenshots = [];
-    for (let i = 0; i < 3 && i < replyElements.length; i++) {
-      const box = await replyElements[i].boundingBox();
-      if (box) {
-        await this.page.screenshot({
-          path: `screenshot/reply${i + 1}.png`,
-          clip: {
-            x: box.x,
-            y: box.y,
-            width: Math.min(box.width, this.page.viewport().width),
-            height: Math.min(box.height, this.page.viewport().height),
-          }
-        });
-        screenshots.push(`succes screenshot/reply ${i + 1}.png`);
-      } else {
-        screenshots.push(`Failed to take screenshot of reply ${i + 1}.`);
-      }
+  async extractReplies() {
+    if (this.response) {
+      // Use .map() to transform each edge into the desired shape.
+      const replies = this.response.data.node.allCommentsConnection.edges.map(edge => {
+        const contentObj = JSON.parse(edge.node.contentQtextDocument.legacyJson);
+        // Extract text from the content object.
+        const extractedText = contentObj.sections.map(section =>
+          section.spans.map(span => span.text).join('') 
+        ).join('\n');
+  
+        // Return an object for each reply with profile image URL, given name, and the extracted text.
+        return {
+          profileImageUrl: edge.node.user.profileImageUrl,
+          givenName: edge.node.user.names[0].givenName,
+          textReply: extractedText 
+        };
+      });
+  
+      // Filter out replies where textReply is empty (or consists only of whitespace).
+      return replies.filter(reply => reply.textReply.trim().length > 0);
     }
-
-    const repliesText = await this.page.evaluate((selector) => {
-      const elements = Array.from(document.querySelectorAll(selector));
-      return elements.map(element => element.innerText.trim());
-    }, textSelector);
-
-    return { repliesText: repliesText.slice(0, 3), screenshots };
+    return []; 
   }
-
   async close() {
     await this.browser.close();
   }
