@@ -5,11 +5,11 @@ const { config, createAudioFromText } = require('tiktok-tts');
 const { OpenAI } = require("openai");
 const QuoraExtractor = require("./src/lib/Quora.class");
 const {info,error} = require("./src/lib/logger");
-const generateImages = require("./tes");
 const processVideos = require("./src/lib/utils/videoMaker");
 const termkit = require("terminal-kit");
 const term = termkit.terminal;
 const Box = require("cli-box");
+const generateImages = require("./src/lib/utils/genImages");
 require('dotenv').config();
 var b4 = Box("70x5", {
   text: "Quora Video Generator \n Author : Abdul Muttaqin",
